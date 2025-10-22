@@ -4,105 +4,129 @@ import { Card } from "../components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "../components/ui/tabs";
 import { Sparkles, Clock, Star, Filter } from "lucide-react";
 import { Button } from "../components/ui/button";
+import { useEffect, useState } from "react";
+
+interface DashboardSummary {
+  tracked_trends_count: number;
+  active_topics_count: number;
+  updated_recently_count: number;
+  platform_breakdown: Record<string, number>;
+  top_topics: Array<{
+    topic: string;
+    mentions: number;
+    last_updated: string;
+  }>;
+}
+
+interface ForYouData {
+  relevance_score: number;
+  for_you: Array<any>;
+  trending: Array<any>;
+  following: Array<any>;
+}
+
+const platformColors: Record<string, string> = {
+  Twitter: "#1DA1F2",
+  YouTube: "#FF0000",
+  Reddit: "#FF4500",
+  Google: "#4285F4",
+  Youtube: "#FF0000",
+};
 
 export function Dashboard() {
-  const personalizedTrends = [
-    {
-      topic: "AI Image Generation Tools",
-      platform: "YouTube",
-      likes: 234000,
-      dislikes: 8900,
-      shares: 45600,
-      comments: 34500,
-      sentiment: "positive" as const,
-      trend: "rising" as const,
-      relevanceScore: 95,
-      tags: ["AI", "Creative", "Technology"],
-      platformColor: "#FF0000",
-    },
-    {
-      topic: "React 19 Features Discussion",
-      platform: "Reddit",
-      likes: 89000,
-      dislikes: 3200,
-      shares: 12400,
-      comments: 23100,
-      sentiment: "positive" as const,
-      trend: "rising" as const,
-      relevanceScore: 92,
-      tags: ["React", "Web Dev", "JavaScript"],
-      platformColor: "#FF4500",
-    },
-    {
-      topic: "Climate Tech Innovations",
-      platform: "Twitter",
-      likes: 156000,
-      dislikes: 12300,
-      shares: 67800,
-      comments: 45200,
-      sentiment: "neutral" as const,
-      trend: "stable" as const,
-      relevanceScore: 88,
-      tags: ["Climate", "Technology", "Innovation"],
-      platformColor: "#1DA1F2",
-    },
-    {
-      topic: "Machine Learning Frameworks",
-      platform: "Google",
-      likes: 45200,
-      dislikes: 2100,
-      shares: 8900,
-      comments: 12300,
-      sentiment: "positive" as const,
-      trend: "rising" as const,
-      relevanceScore: 85,
-      tags: ["ML", "AI", "Development"],
-      platformColor: "#4285F4",
-    },
-    {
-      topic: "Cryptocurrency Market Analysis",
-      platform: "Twitter",
-      likes: 201000,
-      dislikes: 45600,
-      shares: 89000,
-      comments: 67800,
-      sentiment: "negative" as const,
-      trend: "falling" as const,
-      relevanceScore: 78,
-      tags: ["Crypto", "Finance", "Trading"],
-      platformColor: "#1DA1F2",
-    },
-    {
-      topic: "Space Exploration Updates",
-      platform: "YouTube",
-      likes: 345000,
-      dislikes: 6700,
-      shares: 78900,
-      comments: 56700,
-      sentiment: "positive" as const,
-      trend: "rising" as const,
-      relevanceScore: 82,
-      tags: ["Space", "Science", "NASA"],
-      platformColor: "#FF0000",
-    },
-  ];
+  const [summary, setSummary] = useState<DashboardSummary | null>(null);
+  const [forYouData, setForYouData] = useState<ForYouData | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const userInterests = [
-    { name: "AI & Machine Learning", count: 245, color: "#8B5CF6" },
-    { name: "Web Development", count: 189, color: "#3B82F6" },
-    { name: "Climate & Environment", count: 156, color: "#10B981" },
-    { name: "Space & Science", count: 134, color: "#F59E0B" },
-    { name: "Cryptocurrency", count: 98, color: "#EF4444" },
-  ];
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [summaryRes, forYouRes] = await Promise.all([
+          fetch("/api/dashboard/summary"),
+          fetch("/api/dashboard/for-you?interests=ai,technology,web development,climate,space&limit=20"),
+        ]);
+
+        const summaryData = await summaryRes.json();
+        const forYouDataRes = await forYouRes.json();
+
+        setSummary(summaryData);
+        setForYouData(forYouDataRes);
+      } catch (error) {
+        console.error("Error fetching dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const formatTrendData = (post: any) => {
+    const engagement = (post.likes || 0) + (post.shares || 0) + (post.comments || 0);
+    const platformColor = platformColors[post.platform] || "#4285F4";
+    
+    const sentiment = (post.sentiment || "neutral").toLowerCase() as "positive" | "negative" | "neutral";
+    
+    const relevanceScore = post.relevance_score || 0;
+    const trend = relevanceScore > 70 ? "rising" : relevanceScore < 40 ? "falling" : "stable";
+    
+    const tags = post.hashtags 
+      ? post.hashtags.split(",").map((tag: string) => tag.trim().replace("#", "")).filter((tag: string) => tag).slice(0, 3)
+      : [];
+    
+    return {
+      topic: post.topic || post.content?.substring(0, 50) || "Unknown Topic",
+      platform: post.platform,
+      likes: post.likes || 0,
+      dislikes: 0,
+      shares: post.shares || 0,
+      comments: post.comments || 0,
+      sentiment,
+      trend: trend as "rising" | "falling" | "stable",
+      relevanceScore: Math.round(relevanceScore),
+      tags,
+      platformColor,
+    };
+  };
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-slate-600">Loading dashboard...</p>
+        </div>
+      </div>
+    );
+  }
+
+  const platformBreakdown = summary?.platform_breakdown || {};
+  const totalPosts = Object.values(platformBreakdown).reduce((a, b) => a + b, 0);
+  const platformDistribution = Object.entries(platformBreakdown).map(([name, count]) => ({
+    name,
+    percentage: totalPosts > 0 ? Math.round((count / totalPosts) * 100) : 0,
+    color: platformColors[name] || "#4285F4",
+  }));
+
+  const topInterests = (summary?.top_topics || []).slice(0, 5).map((topic, index) => {
+    const colors = ["#8B5CF6", "#3B82F6", "#10B981", "#F59E0B", "#EF4444"];
+    return {
+      name: topic.topic,
+      count: topic.mentions,
+      color: colors[index % colors.length],
+    };
+  });
+
+  const forYouTrends = (forYouData?.for_you || []).map(formatTrendData);
+  const trendingPosts = (forYouData?.trending || []).map(formatTrendData);
+  const followingPosts = (forYouData?.following || []).map(formatTrendData);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 relative overflow-hidden">
-      {/* Animated background elements */}
       <div className="absolute top-20 right-10 w-72 h-72 bg-gradient-to-br from-yellow-300 to-orange-300 opacity-20 rounded-full blur-3xl animate-pulse" />
       <div className="absolute bottom-20 left-10 w-96 h-96 bg-gradient-to-br from-cyan-300 to-blue-300 opacity-20 rounded-full blur-3xl" />
       
       <div className="max-w-7xl mx-auto px-6 py-8 relative z-10">
-        {/* Header */}
         <motion.div
           className="mb-8"
           initial={{ opacity: 0, y: -20 }}
@@ -114,13 +138,12 @@ export function Dashboard() {
           </p>
         </motion.div>
 
-        {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
           {[
-            { label: "Trends Tracked", value: "1,247", icon: Sparkles, color: "blue" },
-            { label: "Active Topics", value: "342", icon: Star, color: "purple" },
-            { label: "Updates Today", value: "89", icon: Clock, color: "green" },
-            { label: "Relevance Score", value: "92%", icon: Filter, color: "pink" },
+            { label: "Trends Tracked", value: summary?.tracked_trends_count?.toString() || "0", icon: Sparkles, color: "blue" },
+            { label: "Active Topics", value: summary?.active_topics_count?.toString() || "0", icon: Star, color: "purple" },
+            { label: "Updates Today", value: summary?.updated_recently_count?.toString() || "0", icon: Clock, color: "green" },
+            { label: "Relevance Score", value: `${Math.round(forYouData?.relevance_score || 0)}%`, icon: Filter, color: "pink" },
           ].map((stat, index) => (
             <motion.div
               key={index}
@@ -145,9 +168,7 @@ export function Dashboard() {
           ))}
         </div>
 
-        {/* Main Content */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Trends Feed */}
           <div className="lg:col-span-2">
             <Tabs defaultValue="foryou" className="w-full">
               <TabsList className="bg-white border border-slate-200 mb-6">
@@ -157,34 +178,48 @@ export function Dashboard() {
               </TabsList>
 
               <TabsContent value="foryou" className="space-y-4">
-                {personalizedTrends.map((trend, index) => (
-                  <TrendCard key={index} {...trend} />
-                ))}
+                {forYouTrends.length > 0 ? (
+                  forYouTrends.map((trend, index) => (
+                    <TrendCard key={index} {...trend} />
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-slate-500">
+                    <p>No personalized trends available</p>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="trending" className="space-y-4">
-                {personalizedTrends
-                  .filter((t) => t.trend === "rising")
-                  .map((trend, index) => (
+                {trendingPosts.length > 0 ? (
+                  trendingPosts.map((trend, index) => (
                     <TrendCard key={index} {...trend} />
-                  ))}
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-slate-500">
+                    <p>No trending posts available</p>
+                  </div>
+                )}
               </TabsContent>
 
               <TabsContent value="following" className="space-y-4">
-                <div className="text-center py-12 text-slate-500">
-                  <p>Follow topics to see them here</p>
-                </div>
+                {followingPosts.length > 0 ? (
+                  followingPosts.map((trend, index) => (
+                    <TrendCard key={index} {...trend} />
+                  ))
+                ) : (
+                  <div className="text-center py-12 text-slate-500">
+                    <p>Follow topics to see them here</p>
+                  </div>
+                )}
               </TabsContent>
             </Tabs>
           </div>
 
-          {/* Sidebar */}
           <div className="space-y-6">
-            {/* Your Interests */}
             <Card className="bg-white border-slate-200 p-6 shadow-md">
               <h3 className="text-slate-900 mb-4">Your Interests</h3>
               <div className="space-y-3">
-                {userInterests.map((interest, index) => (
+                {topInterests.map((interest, index) => (
                   <motion.div
                     key={index}
                     initial={{ opacity: 0, x: 20 }}
@@ -204,7 +239,7 @@ export function Dashboard() {
                           background: `linear-gradient(90deg, ${interest.color}, ${interest.color}dd)`
                         }}
                         initial={{ width: 0 }}
-                        animate={{ width: `${(interest.count / 245) * 100}%` }}
+                        animate={{ width: `${Math.min((interest.count / (topInterests[0]?.count || 1)) * 100, 100)}%` }}
                         transition={{ duration: 1, delay: 0.3 + index * 0.1 }}
                       />
                     </div>
@@ -216,7 +251,6 @@ export function Dashboard() {
               </Button>
             </Card>
 
-            {/* Quick Actions */}
             <Card className="bg-white border-slate-200 p-6 shadow-md">
               <h3 className="text-slate-900 mb-4">Quick Actions</h3>
               <div className="space-y-2">
@@ -237,16 +271,10 @@ export function Dashboard() {
               </div>
             </Card>
 
-            {/* Platform Distribution */}
             <Card className="bg-white border-slate-200 p-6 shadow-md">
               <h3 className="text-slate-900 mb-4">Platform Distribution</h3>
               <div className="space-y-2">
-                {[
-                  { name: "YouTube", percentage: 35, color: "#FF0000" },
-                  { name: "Twitter", percentage: 28, color: "#1DA1F2" },
-                  { name: "Reddit", percentage: 22, color: "#FF4500" },
-                  { name: "Google", percentage: 15, color: "#4285F4" },
-                ].map((platform, index) => (
+                {platformDistribution.map((platform, index) => (
                   <div key={index}>
                     <div className="flex items-center justify-between mb-1 text-sm">
                       <span className="text-slate-700">{platform.name}</span>

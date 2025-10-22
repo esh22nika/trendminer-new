@@ -11,12 +11,12 @@ import nltk # Import nltk
 # --- Setup NLTK ---
 try:
     nltk.data.find('corpora/stopwords')
-except nltk.downloader.DownloadError:
+except LookupError:
     print("Downloading NLTK stopwords...")
     nltk.download('stopwords')
 try:
     nltk.data.find('tokenizers/punkt')
-except nltk.downloader.DownloadError:
+except LookupError:
      print("Downloading NLTK punkt tokenizer...")
      nltk.download('punkt')
 # --- End NLTK Setup ---
@@ -45,6 +45,25 @@ STOPWORDS = set(nltk_stopwords.words('english')) | set([
     'rt', 'via', 'amp', 'new', 'one', 'post', 'see', 'also', 'just', 'like', 'know', 'get', 'think', 'thoughts' # Added common social media words
 ])
 
+
+# --- Helper Functions ---
+
+def format_post_for_response(row):
+    """Format a DataFrame row into a post response dictionary."""
+    return {
+        'post_id': str(row.get('post_id', '')),
+        'platform': str(row.get('platform', '')),
+        'user': str(row.get('user', '')),
+        'content': str(row.get('content', '')),
+        'hashtags': str(row.get('hashtags', '')),
+        'topic': str(row.get('topic', '')),
+        'likes': int(row.get('likes', 0)),
+        'shares': int(row.get('shares', 0)),
+        'comments': int(row.get('comments', 0)),
+        'sentiment': str(row.get('sentiment', '')),
+        'timestamp': str(row.get('timestamp', '')),
+        'region': str(row.get('region', ''))
+    }
 
 # --- Dashboard Analytics ---
 

@@ -80,9 +80,11 @@ def for_you():
         
         # Get trending posts (high engagement + recent)
         trending_posts = []
-        df_trending = matched_posts[matched_posts['recency'] > 0.5].nlargest(limit, 'engagement')
+        df_trending = matched_posts[matched_posts['recency_weight'] > 0.5].nlargest(limit, 'engagement')
         for _, row in df_trending.head(10).iterrows():
-            trending_posts.append(format_post_for_response(row))
+            post = format_post_for_response(row)
+            post['relevance_score'] = round(float(row['relevance']), 2)
+            trending_posts.append(post)
         
         # Following posts (if user has followed topics - placeholder)
         following_posts = []
